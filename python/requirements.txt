@@ -1,0 +1,5 @@
+# Core (crossed_junctions.py, generate_examples.py, review_targets.py): stdlib only.
+# Figures (draw_crossed.py) additionally need:
+matplotlib
+numpy
+draw_rna    # https://github.com/eternagame/draw_rna

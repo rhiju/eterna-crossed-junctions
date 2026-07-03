@@ -48,7 +48,9 @@ python/
                          # junction detection, check()
   generate_examples.py   # writes examples/*.dbn (len 100, stems>=4bp), self-verified
   review_targets.py      # runs the check over real Eterna OpenKnotAIDesignData targets
+  draw_crossed.py        # draw_rna figures: junctions green(crossed)/red(bare), PK arcs
 examples/                # positive_1..5.dbn, negative_1..5.dbn
+figures/                 # rendered PNGs (see below)
 data/                    # cached target CSVs (Git-LFS, downloaded on first run)
 typescript/              # CrossedJunctionConstraint.ts — sketch for the EternaJS port
 PORTING.md               # how the Python maps onto EternaJS SecStruct / Constraint
@@ -66,6 +68,26 @@ python3 review_targets.py --detail  # + per-junction breakdown
 # check one structure:
 python3 -c "import crossed_junctions as c; print(c.check('<dot-bracket>').summary())"
 ```
+
+## Figures (`figures/`)
+
+`draw_crossed.py` renders each structure with
+[draw_rna](https://github.com/eternagame/draw_rna): the nested **backbone** (layer 0)
+is laid out normally, junction residues are colored **green (crossed)** or **red
+(bare)**, and the non-nested **pseudoknot pairs are drawn as arcs** ("strings")
+between the paired residues.
+
+```bash
+cd python
+python3 draw_crossed.py                         # default real targets (3 pass, 3 fail)
+python3 draw_crossed.py examples                # the 10 generated examples
+python3 draw_crossed.py "Kissing multiloops" SV_c   # named targets
+```
+
+Needs `matplotlib`, `numpy`, and `draw_rna` (figures only; the core check/generator
+are stdlib-only). E.g. *Kissing multiloops* shows two green junctions bridged by the
+kissing-pseudoknot arcs; *SV_c* shows one green junction while its two large 4-way
+junctions sit red and untouched.
 
 ## Examples (`examples/`, all length 100, every stem ≥ 4 bp)
 
