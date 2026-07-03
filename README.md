@@ -85,9 +85,20 @@ python3 draw_crossed.py "Kissing multiloops" SV_c   # named targets
 ```
 
 Needs `matplotlib`, `numpy`, and `draw_rna` (figures only; the core check/generator
-are stdlib-only). E.g. *Kissing multiloops* shows two green junctions bridged by the
-kissing-pseudoknot arcs; *SV_c* shows one green junction while its two large 4-way
-junctions sit red and untouched.
+are stdlib-only).
+
+**PASS — *Kissing multiloops*** (the Mol9 progenitor): both 3-way junctions are green,
+bridged by the kissing-pseudoknot arcs.
+
+<img src="figures/Kissing_multiloops.png" width="640" alt="Kissing multiloops: two crossed junctions">
+
+**FAIL — *SV_c***: one junction is crossed (green), but its two large 4-way junctions
+sit red/bare while the pseudoknots arc right past them — the "floppy multi-helix
+junction with no tertiary contact" geometry this constraint is meant to catch.
+
+<img src="figures/SV_c.png" width="640" alt="SV_c: one crossed junction, two bare junctions">
+
+See `figures/` for the full gallery (6 real targets + 10 generated examples).
 
 ## Examples (`examples/`, all length 100, every stem ≥ 4 bp)
 
