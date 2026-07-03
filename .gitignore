@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+# Cached target CSVs are pulled on demand by review_targets.py (Git-LFS upstream)
+data/*.csv
