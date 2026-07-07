@@ -96,7 +96,9 @@ def arc(ax, x0, y0, x1, y1, color, lw=1.6):
     ax.add_patch(PathPatch(path, fill=False, edgecolor=color, lw=lw, alpha=0.85))
 
 
-def draw_one(name: str, struct: str, outpath: str):
+def render_on_ax(ax, name: str, struct: str, title_fontsize: int = 20, ends: bool = True):
+    """Draw one structure onto `ax`; return its Report. Reused for single figures
+    and for multi-panel grids (e.g. the submissions PDF)."""
     rep = cj.check(struct)
     layers = rep.layers
     xs, ys = coords_for(backbone_dbn(layers[0]))
@@ -112,8 +114,6 @@ def draw_one(name: str, struct: str, outpath: str):
             node_color[i] = RED
         elif i in crossed_res:
             node_color[i] = GREEN
-
-    fig, ax = plt.subplots(figsize=(9, 9))
 
     # backbone chain
     ax.plot(xs, ys, "-", color=CHAIN, lw=1.0, zorder=1)
@@ -135,28 +135,38 @@ def draw_one(name: str, struct: str, outpath: str):
         ax.add_patch(Circle((xs[i], ys[i]), rad, facecolor=c,
                             edgecolor="#444444" if i in node_color else "none",
                             lw=0.6, zorder=3))
-    # 5'/3' labels
-    ax.annotate("5'", (xs[0], ys[0]), fontsize=13, ha="right", va="top", weight="bold")
-    ax.annotate("3'", (xs[-1], ys[-1]), fontsize=13, ha="left", va="bottom", weight="bold")
+    if ends:
+        ax.annotate("5'", (xs[0], ys[0]), fontsize=13, ha="right", va="top", weight="bold")
+        ax.annotate("3'", (xs[-1], ys[-1]), fontsize=13, ha="left", va="bottom", weight="bold")
 
     n_pass = sum(j.passed for j in rep.junctions)
     verdict = "PASS" if rep.satisfied else "FAIL"
     ax.set_title(f"{name}   [{verdict}]   {n_pass}/{len(rep.junctions)} junctions crossed",
-                 fontsize=20, weight="bold", color=GREEN if rep.satisfied else RED)
+                 fontsize=title_fontsize, weight="bold",
+                 color=GREEN if rep.satisfied else RED)
+    ax.set_aspect("equal")
+    ax.margins(0.08)
+    ax.axis("off")
+    return rep
 
-    # legend
-    handles = [
+
+def legend_handles():
+    return [
         plt.Line2D([], [], marker="o", ls="", mfc=GREEN, mec="#444", label="crossed junction"),
         plt.Line2D([], [], marker="o", ls="", mfc=RED, mec="#444", label="bare junction"),
         plt.Line2D([], [], color=PK_COLORS[0], lw=1.8, label="pseudoknot pair"),
     ]
-    ax.legend(handles=handles, fontsize=12, loc="upper left", frameon=True)
 
-    ax.set_aspect("equal")
-    ax.axis("off")
+
+def draw_one(name: str, struct: str, outpath: str):
+    fig, ax = plt.subplots(figsize=(9, 9))
+    rep = render_on_ax(ax, name, struct)
+    ax.legend(handles=legend_handles(), fontsize=12, loc="upper left", frameon=True)
     fig.tight_layout()
     fig.savefig(outpath, dpi=130, bbox_inches="tight")
     plt.close(fig)
+    n_pass = sum(j.passed for j in rep.junctions)
+    verdict = "PASS" if rep.satisfied else "FAIL"
     print(f"  {verdict}  {n_pass}/{len(rep.junctions)}  ->  {os.path.relpath(outpath, HERE)}")
 
 

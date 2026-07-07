@@ -49,6 +49,10 @@ def parse_dotbracket(dbn: str) -> Pairs:
     pairs: Pairs = [-1] * n
     stacks = {b: [] for b in _OPEN}          # bracket stacks
     letter_stacks: dict = {}                  # 'A' -> [positions]
+    # Letter-pair polarity (which case opens) is auto-detected from the first
+    # letter seen, matching EternaJS SecStruct.setPairs: some structures use
+    # Aa (upper opens), others aA (lower opens).
+    opener_upper = None
 
     for i, c in enumerate(dbn):
         if c in (".", "-", "&", ":", ","):
@@ -63,8 +67,10 @@ def parse_dotbracket(dbn: str) -> Pairs:
             pairs[i] = j
             pairs[j] = i
         elif c.isalpha():
-            if c.isupper():                   # opener
-                letter_stacks.setdefault(c, []).append(i)
+            if opener_upper is None:
+                opener_upper = c.isupper()
+            if c.isupper() == opener_upper:   # opener
+                letter_stacks.setdefault(c.upper(), []).append(i)
             else:                             # closer
                 st = letter_stacks.get(c.upper())
                 if not st:
