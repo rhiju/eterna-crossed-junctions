@@ -168,11 +168,9 @@ def main():
 
     rows = load_rows(in_csv)
     npages = (len(rows) + PER_PAGE - 1) // PER_PAGE
-    print(f"{len(rows)} structures -> summary + {npages} grid pages -> {out_pdf}")
+    print(f"{len(rows)} structures -> {npages} grid pages + summary -> {out_pdf}")
 
     with PdfPages(out_pdf) as pdf:
-        n_pass, n_fail, n_err = summary_page(pdf, rows, os.path.basename(in_csv))
-        print("  summary page done")
         for page in range(npages):
             fig, axes = plt.subplots(ROWS, COLS, figsize=(16, 20))
             axes = axes.ravel()
@@ -202,6 +200,9 @@ def main():
             pdf.savefig(fig, dpi=110)
             plt.close(fig)
             print(f"  page {page + 1}/{npages} done")
+
+        n_pass, n_fail, n_err = summary_page(pdf, rows, os.path.basename(in_csv))
+        print("  summary page done (at end)")
 
     print(f"\n{n_pass} satisfy, {n_fail} fail, {n_err} render errors.")
     print(f"Wrote {out_pdf}")
