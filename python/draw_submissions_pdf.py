@@ -23,6 +23,7 @@ matplotlib.rcParams["font.family"] = "Helvetica"
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+import crossed_junctions as cj
 import draw_crossed as dc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +46,114 @@ def load_rows(path: str):
     return rows
 
 
+def summary_page(pdf, rows, src_name):
+    """Cover page: overall counts, a color key, and the failing submissions."""
+    results = []   # (title, satisfied, n_pass, n_total, error)
+    for title, struct in rows:
+        try:
+            rep = cj.check(struct)
+            results.append((title, rep.satisfied,
+                            sum(j.passed for j in rep.junctions),
+                            len(rep.junctions), None))
+        except Exception as e:
+            results.append((title, False, 0, 0, str(e)))
+
+    n = len(results)
+    n_pass = sum(1 for r in results if r[4] is None and r[1])
+    n_fail = sum(1 for r in results if r[4] is None and not r[1])
+    n_err = sum(1 for r in results if r[4] is not None)
+    fails = [r for r in results if r[4] is None and not r[1]]
+
+    fig = plt.figure(figsize=(16, 20))
+    ax = fig.add_axes([0.06, 0.04, 0.88, 0.92])
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    def T(x, y, s, size=13, weight="normal", color="#222222", family=None):
+        ax.text(x, y, s, transform=ax.transAxes, fontsize=size, weight=weight,
+                color=color, va="top", ha="left", family=family)
+
+    y = 0.985
+    T(0.0, y, "Eterna submissions — crossed-junction check", size=26, weight="bold")
+    y -= 0.035
+    T(0.0, y, f"source: {src_name}", size=11, color="#666666")
+    y -= 0.045
+    T(0.0, y, f"{n} submissions:  ", size=16, weight="bold")
+    ax.text(0.24, y, f"{n_pass} satisfy", transform=ax.transAxes, fontsize=16,
+            weight="bold", color=dc.GREEN, va="top")
+    ax.text(0.42, y, f"{n_fail} fail", transform=ax.transAxes, fontsize=16,
+            weight="bold", color=dc.RED, va="top")
+    ax.text(0.55, y, f"{n_err} unparsed", transform=ax.transAxes, fontsize=16,
+            color="#888888", va="top")
+
+    # ---- color key -------------------------------------------------------
+    y -= 0.06
+    T(0.0, y, "What the drawing shows", size=18, weight="bold")
+    y -= 0.03
+    T(0.0, y, "Each panel lays out the nested “backbone” of one submission; "
+             "the non-nested pseudoknot pairs are drawn as arcs over it.",
+      size=12, color="#444444")
+
+    def marker(yy, kind, color, label, sub):
+        if kind == "circle":
+            ax.scatter([0.03], [yy], s=170, c=[color], edgecolors="#444444",
+                       linewidths=0.8, transform=ax.transAxes, zorder=3)
+        else:  # line
+            ax.plot([0.015, 0.05], [yy, yy], color=color, lw=3,
+                    transform=ax.transAxes)
+        ax.text(0.08, yy, label, transform=ax.transAxes, fontsize=13,
+                weight="bold", va="center", ha="left")
+        ax.text(0.08, yy - 0.016, sub, transform=ax.transAxes, fontsize=11,
+                color="#555555", va="center", ha="left")
+
+    y -= 0.05
+    marker(y, "circle", dc.GREEN, "green nucleotide  =  crossed junction",
+           "a base bordering a ≥3-way junction (multiloop or exterior loop) that IS touched by a pseudoknot")
+    y -= 0.055
+    marker(y, "circle", dc.RED, "red nucleotide  =  bare junction",
+           "a base bordering a ≥3-way junction that is NOT crossed by any pseudoknot — the case we flag")
+    y -= 0.055
+    marker(y, "circle", dc.GRAY, "gray nucleotide  =  everything else",
+           "a base not bordering a ≥3-way junction (helices, hairpin/internal loops, tails)")
+    y -= 0.055
+    marker(y, "line", dc.BB_PAIR, "gray lines  =  backbone",
+           "the chain plus the nested base pairs (layer 0) — the secondary structure that is drawn")
+    y -= 0.055
+    marker(y, "line", dc.PK_COLORS[0], "colored arcs  =  pseudoknot pairs",
+           "the non-nested (crossing) pairs shown as strings between partners; one color per extra layer "
+           "(purple, blue, orange, teal)")
+
+    y -= 0.06
+    T(0.0, y, "Rule:", size=14, weight="bold")
+    ax.text(0.06, y, "a submission PASSES when every ≥3-way junction has at least one green "
+                     "(crossed) base; it FAILS if any such junction is entirely bare (red).",
+            transform=ax.transAxes, fontsize=12, color="#444444", va="top")
+
+    # ---- failing list ----------------------------------------------------
+    y -= 0.055
+    T(0.0, y, f"Failing submissions ({n_fail})", size=18, weight="bold", color=dc.RED)
+    y -= 0.03
+    if n_err:
+        T(0.0, y, f"(plus {n_err} that could not be parsed)", size=11, color="#888888")
+        y -= 0.022
+    col_x = [0.0, 0.5]
+    start_y = y
+    per_col = 14
+    for i, (title, _sat, npass, ntot, _e) in enumerate(fails):
+        cx = col_x[i // per_col] if i // per_col < len(col_x) else col_x[-1]
+        ry = start_y - 0.026 * (i % per_col)
+        label = title if len(title) <= 40 else title[:37] + "..."
+        ax.text(cx, ry, f"•  {label}", transform=ax.transAxes, fontsize=12,
+                va="top", ha="left")
+        ax.text(cx + 0.34, ry, f"{npass}/{ntot} crossed", transform=ax.transAxes,
+                fontsize=11, color=dc.RED, va="top", ha="left")
+
+    pdf.savefig(fig, dpi=110)
+    plt.close(fig)
+    return n_pass, n_fail, n_err
+
+
 def main():
     args = sys.argv[1:]
     if args and args[0].endswith(".csv"):
@@ -59,10 +168,11 @@ def main():
 
     rows = load_rows(in_csv)
     npages = (len(rows) + PER_PAGE - 1) // PER_PAGE
-    print(f"{len(rows)} structures -> {npages} pages -> {out_pdf}")
+    print(f"{len(rows)} structures -> summary + {npages} grid pages -> {out_pdf}")
 
-    n_pass = n_fail = n_err = 0
     with PdfPages(out_pdf) as pdf:
+        n_pass, n_fail, n_err = summary_page(pdf, rows, os.path.basename(in_csv))
+        print("  summary page done")
         for page in range(npages):
             fig, axes = plt.subplots(ROWS, COLS, figsize=(16, 20))
             axes = axes.ravel()
@@ -74,13 +184,8 @@ def main():
                 title, struct = batch[k]
                 label = title if len(title) <= 34 else title[:31] + "..."
                 try:
-                    rep = dc.render_on_ax(ax, label, struct, title_fontsize=10, ends=False)
-                    if rep.satisfied:
-                        n_pass += 1
-                    else:
-                        n_fail += 1
+                    dc.render_on_ax(ax, label, struct, title_fontsize=10, ends=False)
                 except Exception as e:  # malformed notation etc.
-                    n_err += 1
                     ax.axis("off")
                     ax.text(0.5, 0.5, f"{label}\n(could not render: {e})",
                             ha="center", va="center", fontsize=8, color="#aa0000",
