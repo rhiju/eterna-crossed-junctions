@@ -12,7 +12,7 @@ each piece to its EternaJS counterpart so wiring it into the game is mechanical.
 | `crossed_pairs` / `crossed_residues` | `SecStruct.getCrossedPairs()` already exists (same interleave test). Iterate its `pairingPartner(i)` to get the residue set. |
 | `_cross(bp1, bp2)` | Inlined `crosses()` in the draft; identical to the test inside `SecStruct.getCrossedPairs()`. |
 | `stems(pairs)` | `SecStruct.stems()` already exists. |
-| `separate_layers(pairs)` | `separateLayers()` in the draft, built on `SecStruct.stems()`. Candidate to add to `SecStruct`. |
+| `separate_layers(pairs)` | `separateLayers()` in the draft, which calls `SecStruct.getParenthesis({pseudoknots: true})` and splits by bracket char (same routine `filterForPseudoknots`/`onlyPseudoknots` use). This guarantees the layering matches the game. |
 | `_immediate_children` / `find_junctions` | `immediateChildren()` / `findJunctions()` in the draft. **The only genuinely new logic.** |
 | `check(dbn)` | `CrossedJunctionConstraint.evaluate(context)`. |
 
@@ -45,9 +45,12 @@ satisfied (fraction defined as 1).
 
 ## Behavioral notes worth preserving
 
-- Layering is by **whole stems, longest first**. A naive left-to-right greedy can put
-  a short pseudoknot into layer 0 and push a real backbone helix into layer 1,
-  distorting the junction decomposition. (Discovered while validating the prototype.)
+- Layering **must match Eterna's `getParenthesis`**: walk pairs left-to-right by opening
+  index and place each in the lowest layer where it doesn't cross a pair already there
+  (0 -> `()`, 1 -> `[]`, ...). It is per-pair and left-to-right, **not** stem-based or
+  longest-first. A short pseudoknot that opens before a longer stem it crosses belongs
+  in layer 0 — that is the game's behaviour. (An earlier longest-first heuristic diverged
+  from Eterna and was the bug this fix addresses.)
 - Because `getCrossedPairs()` marks **both** members of a crossed pair, a pseudoknot
   that crosses a junction's own stem also marks that stem's boundary residues — which
   are junction members. So crossing a junction's branch/closing helix satisfies it,

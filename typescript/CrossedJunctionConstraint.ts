@@ -38,12 +38,6 @@ interface Junction {
     members: Set<number>;
 }
 
-// --- crossing test (mirror of SecStruct.getCrossedPairs interleave test) ------
-function crosses(a: BP, b: BP): boolean {
-    return (a[0] < b[0] && b[0] < a[1] && a[1] < b[1])
-        || (b[0] < a[0] && a[0] < b[1] && b[1] < a[1]);
-}
-
 // Residues that participate in any crossed pair, from the full structure.
 function crossedResidues(pairs: SecStruct): Set<number> {
     const crossed = pairs.getCrossedPairs();
@@ -54,32 +48,34 @@ function crossedResidues(pairs: SecStruct): Set<number> {
     return res;
 }
 
-// Split pairs into non-crossing layers, longest stems first, so the nested
-// backbone occupies layer 0 and pseudoknot stems fall to later layers.
+// Split pairs into non-crossing layers EXACTLY as Eterna does. Rather than
+// re-deriving the layering (which is easy to get subtly wrong), we reuse
+// SecStruct.getParenthesis() -- the same routine filterForPseudoknots() /
+// onlyPseudoknots() rely on -- and split its output by bracket character:
+// layer 0 = '()' (the backbone), 1 = '[]', 2 = '{}', 3 = '<>', 4+ = letter pairs.
+// This guarantees our layers match the game and never diverge.
 function separateLayers(pairs: SecStruct): number[][] {
-    const n = pairs.length;
-    const stems: BP[][] = pairs.stems();
-    stems.sort((s1, s2) => (s2.length - s1.length)
-        || Math.min(...s1.flat()) - Math.min(...s2.flat()));
-
-    const layers: BP[][] = [];
-    for (const stem of stems) {
-        let placed = false;
-        for (const layer of layers) {
-            if (stem.every((bp) => layer.every((o) => !crosses(bp, o)))) {
-                layer.push(...stem);
-                placed = true;
-                break;
-            }
-        }
-        if (!placed) layers.push([...stem]);
+    const dbn = pairs.getParenthesis({pseudoknots: true});
+    const charsL = ['(', '[', '{', '<'];
+    const charsR = [')', ']', '}', '>'];
+    for (let i = 0; i < 26; i++) {
+        charsL.push(String.fromCharCode(i + 97)); // a-z open
+        charsR.push(String.fromCharCode(i + 65)); // A-Z close
     }
 
-    return layers.map((layer) => {
-        const arr = new Array<number>(n).fill(-1);
-        for (const [a, b] of layer) { arr[a] = b; arr[b] = a; }
-        return arr;
-    });
+    const layers: number[][] = [];
+    for (let d = 0; d < charsL.length; d++) {
+        if (!dbn.includes(charsL[d])) {
+            if (d < 4) continue;   // a fixed bracket may be unused; keep scanning
+            break;                 // no more letter layers in use
+        }
+        // Keep only this layer's characters, as a plain nested () string.
+        const filtered = Array.from(dbn, (c) => (
+            c === charsL[d] ? '(' : (c === charsR[d] ? ')' : '.')
+        )).join('');
+        layers.push(SecStruct.fromParens(filtered, false).pairs);
+    }
+    return layers;
 }
 
 // Immediate contents of the loop spanning the open interval (lo, hi).

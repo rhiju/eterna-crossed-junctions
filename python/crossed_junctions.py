@@ -133,32 +133,49 @@ def crossed_residues(pairs: Pairs) -> Set[int]:
 
 def separate_layers(pairs: Pairs) -> List[Pairs]:
     """
-    Split base pairs into layers such that no two pairs within a layer cross.
+    Split base pairs into non-crossing layers, matching EternaJS exactly.
 
-    Layering is done by whole stems (helices), longest first: a stem is placed
-    into the first existing layer none of its pairs cross, else a new layer is
-    started. This keeps the dominant nested "backbone" in layer 0 and pushes the
-    (typically shorter) pseudoknot stems into layers 1, 2, ... -- so the backbone
-    multiloops are read off layer 0 rather than being distorted by a short PK that
-    happens to start earlier. A whole helix is never split across layers.
+    This is a faithful port of the layer/degree assignment in
+    `SecStruct.getParenthesis({pseudoknots: true})`: walk pairs left-to-right by
+    OPENING index and place each into the LOWEST-numbered layer where it does not
+    cross a pair already placed in that layer (layer 0 -> '()', 1 -> '[]', 2 ->
+    '{}', 3 -> '<>', 4+ -> letter pairs). Layer 0 is Eterna's "backbone"
+    (== filterForPseudoknots); layers 1+ are the pseudoknots (== onlyPseudoknots).
+
+    NOTE: this is per-pair and left-to-right, NOT stem-based or longest-first. A
+    short pseudoknot stem that opens before a longer stem it crosses lands in
+    layer 0 (Eterna's behaviour); do not "optimize" this to longest-first, or the
+    layer assignment will diverge from the game.
     """
     n = len(pairs)
-    stem_list = stems(pairs)
-    stem_list.sort(key=lambda s: (-len(s), min(min(a, b) for a, b in s)))
+    # For each layer, the closing bases of placed pairs that could still be
+    # crossed, kept in ascending order (mirrors Eterna's closingBasesPerDegree).
+    closing_per_layer: List[List[int]] = []
+    pairs_per_layer: List[List[BP]] = []
 
-    layers: List[List[BP]] = []
-    for stem in stem_list:
+    for a in range(n):
+        b = pairs[a]
+        if b <= a:                      # skip unpaired (b == -1) and closing halves
+            continue
         placed = False
-        for layer in layers:
-            if all(not _cross(bp, other) for bp in stem for other in layer):
-                layer.extend(stem)
+        for d, closing in enumerate(closing_per_layer):
+            # Drop closing bases we've already walked past.
+            while closing and closing[0] < a:
+                closing.pop(0)
+            # Usable layer if nothing open here, or the nearest open pair closes
+            # after this one (so no cross).
+            if not closing or closing[0] > b:
+                pairs_per_layer[d].append((a, b))
+                if not closing or b != closing[0] - 1:
+                    closing.insert(0, b)
                 placed = True
                 break
         if not placed:
-            layers.append(list(stem))
+            closing_per_layer.append([b])
+            pairs_per_layer.append([(a, b)])
 
     layer_arrays: List[Pairs] = []
-    for layer in layers:
+    for layer in pairs_per_layer:
         arr = [-1] * n
         for a, b in layer:
             arr[a] = b
@@ -350,3 +367,11 @@ if __name__ == "__main__":
         print(f"[{ok}] {name}: expected {'PASS' if expected else 'FAIL'}")
         print(rep.summary())
         print()
+
+    # Layering parity with Eterna's getParenthesis: a SHORT stem that opens before
+    # a LONGER stem it crosses must land in layer 0 (left-to-right, not longest-first).
+    dbn = "[[[[......(((((((((....]]]]......)))))))))"
+    layers = separate_layers(parse_dotbracket(dbn))
+    layer0_opener0 = layers[0][0] > 0    # is the pair opening at index 0 in layer 0?
+    print(f"[{'OK' if layer0_opener0 else '!!! MISMATCH'}] "
+          f"layer parity: short early stem is in layer 0 (matches Eterna getParenthesis)")

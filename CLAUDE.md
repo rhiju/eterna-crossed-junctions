@@ -23,7 +23,7 @@ Two phases:
 
 - `python/crossed_junctions.py` — core library (stdlib only). Start here. Key funcs:
   `parse_dotbracket`, `crossed_residues` (port of `SecStruct.getCrossedPairs`),
-  `separate_layers` (stem-based, longest-first), `find_junctions`, `check`.
+  `separate_layers` (Eterna's `getParenthesis` layering, left-to-right), `find_junctions`, `check`.
 - `python/generate_examples.py` — writes/verifies `examples/*.dbn` (len 100, stems ≥4bp).
 - `python/review_targets.py` — runs the check over the OpenKnotAIDesignData targets.
 - `python/draw_crossed.py` — draw_rna figures (junctions green=crossed / red=bare, PKs as arcs).
@@ -45,9 +45,12 @@ stdlib-only. `python3` (not `python`).
 
 ## Conventions / gotchas (please preserve)
 
-- **Layering is by whole stems, longest first.** A naive left-to-right greedy can pull
-  a short pseudoknot into layer 0 and push a real backbone helix out, distorting the
-  junctions. Don't "simplify" this back to per-pair greedy.
+- **Layering must match Eterna's `getParenthesis`** (SecStruct.ts): walk pairs
+  left-to-right by opening index, place each in the lowest layer where it doesn't cross
+  a pair already there (0=`()`, 1=`[]`, ...). It is per-pair and left-to-right — NOT
+  stem-based or longest-first. Don't "optimize" it to longest-first (that was a real bug
+  that diverged from the game). The TS port calls `SecStruct.getParenthesis` directly so
+  it can't drift.
 - Because `getCrossedPairs` marks **both** members of a crossed pair, a pseudoknot
   crossing a junction's own stem also credits that junction (its stem-boundary residues
   are junction members). This is intended.
